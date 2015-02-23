@@ -70,10 +70,10 @@ class Channel {
       // Somebody has resolved the handler already. That was fast.
       // core.async returns a boolean of whether or not something *could* get put to the channel
       // we'll do the same #cargocult
-      return Promise.resolve(!this._isOpen);
+      return Promise.resolve(!this.open);
     }
 
-    if(!this._isOpen) {
+    if(!this.open) {
       // The channel is closed, return false, because we can't put to it.
 
       return Promise.resolve(false);
@@ -83,7 +83,7 @@ class Channel {
       handler.commit()(val);
       this._buffer.add(val);
 
-      while(this._takers.length && this._buffer.size()) {
+      while(this._takers.length && this._buffer.length) {
         let taker = this._takers.pop();
 
         if(taker.active) {
@@ -127,7 +127,7 @@ class Channel {
       return Promise.resolve(undefined); // TODO: this seems like an inappropriate value to resolve to
     }
 
-    if(this._buffer.size()) {
+    if(this._buffer.length) {
       let bufVal = this._buffer.remove();
 
       while(!this._buffer.isFull() && this._putters.length) {
@@ -179,8 +179,8 @@ class Channel {
     }
   }
 
-  isClosed() {
-    return !this._isOpen;
+  get open() {
+    return this._isOpen;
   }
 }
 

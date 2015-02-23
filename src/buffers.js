@@ -15,7 +15,7 @@ class RingBuffer {
     let size = (typeof s === 'number') ? Math.max(1, s) : 1;
     this._tail   = 0;
     this._head   = 0;
-    this.length = 0;
+    this._length = 0;
     this._values = new Array(size);
   }
 
@@ -28,7 +28,7 @@ class RingBuffer {
       // Remove the item from the set of values, update indicies
       this._values[this._tail] = null;
       this._tail = (this._tail + 1) % this._values.length;
-      this.length -= 1;
+      this._length -= 1;
     } else {
       result = null;
     }
@@ -38,7 +38,7 @@ class RingBuffer {
   unshift(val) {
     this._values[this._head] = val;
     this._head = (this._head + 1) % this._values.length;
-    this.length += 1;
+    this._length += 1;
   }
 
   resizingUnshift(val) {
@@ -71,6 +71,10 @@ class RingBuffer {
       this._values = newArry;
     }
   }
+
+  get length() {
+    return this._length;
+  }
 }
 
 // --------------------------------------------------------------------------
@@ -93,7 +97,7 @@ class FixedBuffer {
     this._buf.resizingUnshift(v);
   }
 
-  size() {
+  get length() {
     return this._buf.length;
   }
 }
@@ -120,7 +124,7 @@ class SlidingBuffer extends FixedBuffer {
   }
 
   add(v) {
-    if(this._buf.length == this._size) {
+    if(this._buf.length === this._size) {
       this.remove();
     }
     this._buf.unshift(v);
