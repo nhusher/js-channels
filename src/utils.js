@@ -2,7 +2,8 @@ import { Channel, Handler } from "./channel.js";
 
 
 export function alts(race) {
-  var handlers = [];
+  let handlers = [];
+  let outCh = new Channel();
 
   race.map(function(cmd) {
     if(Array.isArray(cmd)) {
@@ -26,7 +27,9 @@ export function alts(race) {
     }
   });
 
-  return Promise.race(handlers.map((h) => h.promise));
+  outCh.put(Promise.race(handlers.map((h) => h.promise)));
+
+  return outCh;
 }
 
 export function timeout(ms) {
