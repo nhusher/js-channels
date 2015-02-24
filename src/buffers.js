@@ -85,10 +85,6 @@ class FixedBuffer {
     this._size = n;
   }
 
-  isFull() {
-    return this._buf.length === this._size;
-  }
-
   remove() {
     return this._buf.pop();
   }
@@ -100,34 +96,38 @@ class FixedBuffer {
   get length() {
     return this._buf.length;
   }
+
+  get full() {
+    return this._buf.length === this._size;
+  }
 }
 
 // --------------------------------------------------------------------------
 
 class DroppingBuffer extends FixedBuffer {
-  isFull() {
-    return false;
-  }
-
   add(v) {
     if(this._buf.length < this._size) {
       this._buf.unshift(v);
     }
+  }
+
+  get full() {
+    return false;
   }
 }
 
 // --------------------------------------------------------------------------
 
 class SlidingBuffer extends FixedBuffer {
-  isFull() {
-    return false;
-  }
-
   add(v) {
     if(this._buf.length === this._size) {
       this.remove();
     }
     this._buf.unshift(v);
+  }
+
+  get full() {
+    return false;
   }
 }
 

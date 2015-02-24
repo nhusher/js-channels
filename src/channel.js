@@ -47,7 +47,9 @@ class Dispatch {
   }
 }
 
-var dispatch = new Dispatch();
+let dispatch = new Dispatch();
+
+// --------------------------------------------------------------------------
 
 class Channel {
   constructor(sizeOrBuf) {
@@ -77,7 +79,7 @@ class Channel {
       // The channel is closed, return false, because we can't put to it.
 
       return Promise.resolve(false);
-    } else if(!this._buffer.isFull()) {
+    } else if(!this._buffer.full) {
       // The channel has some free space. Stick it in the buffer and then drain any waiting takes.
 
       handler.commit()(val);
@@ -130,7 +132,7 @@ class Channel {
     if(this._buffer.length) {
       let bufVal = this._buffer.remove();
 
-      while(!this._buffer.isFull() && this._putters.length) {
+      while(!this._buffer.full && this._putters.length) {
         let putter = this._putters.pop();
 
         if(putter.active) {
