@@ -1,5 +1,6 @@
 
 import { FixedBuffer, RingBuffer } from "./buffers.js";
+import { _Promise as Promise } from "./promises.js";
 
 // --------------------------------------------------------------------------
 

@@ -1,63 +1,51 @@
 /*jshint node:true */
 
-var gulp = require('gulp');
-var util = require('gulp-util');
-var watchify = require('watchify');
-var reactify = require('reactify');
+var babelify = require('babelify');
 var browserify = require('browserify');
-var source = require('vinyl-source-stream');
-var _6to5ify = require('6to5ify');
+var gulp = require('gulp');
+var rename = require('gulp-rename');
+var sourcemaps = require('gulp-sourcemaps');
+var through2 = require('through2');
+var uglify = require('gulp-uglify');
 
-gulp.task('browser-sync', function () {
-  browserSync({
-    server: {
-      baseDir: "./"
-    }
+var browserified = function() {
+  return through2.obj(function (file, enc, next) {
+    return browserify({ entries: file.path, debug: true })
+        .transform(babelify)
+        .bundle(function(err, res) {
+          file.contents = res;
+          next(null, file);
+        });
   });
+}
+
+gulp.task('browser', function () {
+  gulp.src('src/index.browser.js')
+    .pipe(browserified())
+    .pipe(sourcemaps.init({ loadMaps: true }))
+    .pipe(rename('channels.js'))
+    .pipe(sourcemaps.write('./'))
+    .pipe(gulp.dest('dist/browser'));
 });
 
-gulp.task('watch', function () {
-  var bundler = watchify(browserify(['./src/test.js'], watchify.args).transform(_6to5ify))
-      .on('update', function () { util.log('Rebundling...'); })
-      .on('time', function (time) {
-        util.log('Rebundled in:', util.colors.cyan(time + 'ms'));
-      });
-
-  bundler.transform(reactify);
-  bundler.on('update', rebundle);
-
-  function rebundle() {
-    return bundler.bundle()
-        .on('error', function (err) {
-          util.log(err);
-        })
-        .pipe(source('channels.js'))
-        .pipe(gulp.dest('./dist'));
-  }
-
-  return rebundle();
+gulp.task('browser-min', function () {
+  gulp.src('src/index.browser.js')
+      .pipe(browserified())
+      .pipe(sourcemaps.init({ loadMaps: true }))
+      .pipe(uglify())
+      .pipe(rename('channels.min.js'))
+      .pipe(sourcemaps.write('./'))
+      .pipe(gulp.dest('dist/browser'));
 });
 
-gulp.task('build', function () {
-  var bundler = watchify(browserify(['./src/test.js'], watchify.args).transform(_6to5ify))
-      .on('update', function () { util.log('Rebundling...'); })
-      .on('time', function (time) {
-        util.log('Rebundled in:', util.colors.cyan(time + 'ms'));
-      });
 
-  bundler.transform(reactify);
-  bundler.on('update', rebundle);
+gulp.task('test', function() {
+  gulp.src('test/test.js')
+    .pipe(browserified())
+    .pipe(gulp.dest('dist/tests'));
 
-  function rebundle() {
-    return bundler.bundle()
-        .on('error', function (err) {
-          util.log(err);
-        })
-        .pipe(source('channels.js'))
-        .pipe(gulp.dest('./dist'));
-  }
-
-  return rebundle();
 });
 
-gulp.task('default', ['watch' ]);
+
+
+gulp.task('default', [ 'browser', 'browser-min' ]);

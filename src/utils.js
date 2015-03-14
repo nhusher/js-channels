@@ -1,5 +1,5 @@
 import { Channel, Handler } from "./channel.js";
-
+import { _Promise as Promise } from "./promises.js";
 
 export function alts(race) {
   let handlers = [];
@@ -38,12 +38,24 @@ export function timeout(ms) {
   return ch;
 }
 
-export function pipeline(inCh, outCh, close = true) {
+export function pipe(inCh, outCh, close = true) {
   inCh.take().then(function pipe(v) {
     if(v !== null) {
       outCh.put(v).then(() => inCh.take().then(pipe));
     } else if(close) {
       outCh.close();
+    }
+  });
+}
+
+export function intoArray(ch) {
+  var ret = [];
+  return ch.take().then(function drain(v) {
+    if(v === null) {
+      return ret;
+    } else {
+      ret.push(v);
+      return ch.take().then(drain);
     }
   });
 }
