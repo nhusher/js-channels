@@ -1,4 +1,3 @@
-import { _Promise as Promise } from "./promises.js";
 
 function distribute(taps, val) {
   if(!taps.length) {

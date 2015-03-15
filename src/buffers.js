@@ -23,7 +23,7 @@ class RingBuffer {
     let result;
     if(this.length) {
       // Get the item out of the set of values
-      result = this._values[this._tail] || null;
+      result = (this._values[this._tail] !== null) ? this._values[this._tail] : null;
 
       // Remove the item from the set of values, update indicies
       this._values[this._tail] = null;
@@ -42,7 +42,7 @@ class RingBuffer {
   }
 
   resizingUnshift(val) {
-    if(this.length + 1 == this._values.length) {
+    if(this.length + 1 === this._values.length) {
       this.resize();
     }
     this.unshift(val);
@@ -52,14 +52,14 @@ class RingBuffer {
     let newArry = new Array(this._values.length * 2);
 
     if(this._tail < this._head) {
-      acopy(this._values, this._tail, newArry, 0, head);
+      acopy(this._values, this._tail, newArry, 0, this._head);
 
       this._tail = 0;
       this._head = this.length;
       this._values = newArry;
 
     } else if(this._head < this._tail) {
-      acopy(this._values, 0, newArry, this._values.length - this._tail, head);
+      acopy(this._values, 0, newArry, this._values.length - this._tail, this._head);
 
       this._tail = 0;
       this._head = this.length;

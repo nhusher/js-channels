@@ -7,6 +7,7 @@ var rename = require('gulp-rename');
 var sourcemaps = require('gulp-sourcemaps');
 var through2 = require('through2');
 var uglify = require('gulp-uglify');
+var watch = require('gulp-watch');
 
 var browserified = function() {
   return through2.obj(function (file, enc, next) {
@@ -20,7 +21,7 @@ var browserified = function() {
 }
 
 gulp.task('browser', function () {
-  gulp.src('src/index.browser.js')
+  return gulp.src('src/index.browser.js')
     .pipe(browserified())
     .pipe(sourcemaps.init({ loadMaps: true }))
     .pipe(rename('channels.js'))
@@ -29,7 +30,7 @@ gulp.task('browser', function () {
 });
 
 gulp.task('browser-min', function () {
-  gulp.src('src/index.browser.js')
+  return gulp.src('src/index.browser.js')
       .pipe(browserified())
       .pipe(sourcemaps.init({ loadMaps: true }))
       .pipe(uglify())
@@ -40,12 +41,11 @@ gulp.task('browser-min', function () {
 
 
 gulp.task('test', function() {
-  gulp.src('test/test.js')
+  return gulp.src('test/test.js')
     .pipe(browserified())
     .pipe(gulp.dest('dist/tests'));
 
 });
-
 
 
 gulp.task('default', [ 'browser', 'browser-min' ]);

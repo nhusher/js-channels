@@ -1,56 +1,44 @@
 
 import { FixedBuffer, RingBuffer } from "./buffers.js";
-import { _Promise as Promise } from "./promises.js";
+import { Dispatch } from "./dispatch.js";
 
 // --------------------------------------------------------------------------
 
-class Handler {
-  constructor(handleFn) {
-    let doResolve;
-
+class Transactor {
+  constructor(offer) {
+    this.offered = offer;
+    this.received = null;
+    this.resolved = false;
     this.active = true;
-    this.promise = new Promise(function(resolver) {
-      doResolve = resolver;
-    });
+    this.callbacks = [];
+  }
 
-    this.commit = function() {
-      this.active = false;
-      return function(val) {
-        return handleFn(doResolve, val);
+  commit() {
+    return (val) => {
+      if(this.resolved) {
+        throw new Error("Tried to resolve transactor twice!");
       }
-    };
+      this.received = val;
+      this.resolved = true;
+      this.callbacks.forEach(c => c(val));
+
+      return this.offered;
+    }
+  }
+
+  deref(callback) {
+    if(this.resolved) {
+      callback(this.received);
+    } else {
+      this.callbacks.push(callback);
+    }
   }
 }
 
 
 // --------------------------------------------------------------------------
-
-let defaultAsynchronizer = (typeof setImmediate === 'function') ? function(fn) {
-  return setImmediate(fn);
-} : function(fn) {
-  return setTimeout(fn);
-};
-
-class Dispatch {
-  constructor(asynchronizer) {
-    this._asynchronizer = asynchronizer || defaultAsynchronizer;
-    this._queue = [];
-  }
-
-  run(fn) {
-    this._queue.push(fn);
-
-    this._asynchronizer(() => {
-      while(this._queue.length) {
-        this._queue.shift()();
-      }
-    });
-  }
-}
 
 let dispatch = new Dispatch();
-
-// --------------------------------------------------------------------------
 
 class Channel {
   constructor(sizeOrBuf) {
@@ -61,109 +49,110 @@ class Channel {
     this._isOpen = true;
   }
 
-  put(val, handler) {
+  fill(val, tx = new Transactor(val)) {
     if(val === null) { throw new Error("Cannot put null to a channel."); }
-
-    handler = handler || new Handler((resolve) => {
-      resolve(true);
-      return val;
-    });
-
-    if(!handler.active) {
-      // Somebody has resolved the handler already. That was fast.
-      // core.async returns a boolean of whether or not something *could* get put to the channel
-      // we'll do the same #cargocult
-      return Promise.resolve(!this.open);
-    }
+    if(!(tx instanceof Transactor)) { throw new Error("Expecting Transactor to be passed to fill"); }
+    if(!tx.active) { return tx; }
 
     if(!this.open) {
-      // The channel is closed, return false, because we can't put to it.
+      // Either somebody has resolved the handler already (that was fast) or the channel is closed.
+      // core.async returns a boolean of whether or not something *could* get put to the channel
+      // we'll do the same #cargocult
+      tx.commit()(false);
+    }
 
-      return Promise.resolve(false);
-    } else if(!this._buffer.full) {
+    if(!this._buffer.full) {
       // The channel has some free space. Stick it in the buffer and then drain any waiting takes.
 
-      handler.commit()(val);
+      tx.commit()(true);
       this._buffer.add(val);
 
       while(this._takers.length && this._buffer.length) {
-        let taker = this._takers.pop();
+        let takerTx = this._takers.pop();
 
-        if(taker.active) {
+        if(takerTx.active) {
           let val = this._buffer.remove();
-          taker = taker.commit();
+          let takerCb = takerTx.commit();
 
-          dispatch.run(() => taker(val))
+          dispatch.run(() => takerCb(val));
         }
       }
+
+      return tx;
     } else if(this._takers.length) {
       // The buffer is full but there are waiting takers (e.g. the buffer is size zero)
 
-      let taker = this._takers.pop();
+      let takerTx = this._takers.pop();
 
-      while(this._takers.length && !taker.active) {
-        taker = this._takers.pop();
+      while(this._takers.length && !takerTx.active) {
+        takerTx = this._takers.pop();
       }
 
-      if(taker && taker.active) {
-        handler.commit()(val);
-        taker = taker.commit();
+      if(takerTx && takerTx.active) {
+        tx.commit()(true);
+        let takeCb = takerTx.commit();
 
-        dispatch.run(() => taker(val));
+        dispatch.run(() => takeCb(val));
       } else {
-        this._putters.resizingUnshift(handler);
+        this._putters.resizingUnshift(tx);
       }
     } else {
-      this._putters.resizingUnshift(handler);
+      this._putters.resizingUnshift(tx);
     }
 
-    return handler.promise;
+    return tx;
   }
 
-  take(handler) {
-    handler = handler || new Handler((resolve, val) => {
-      resolve(val);
-      return;
+  put(val, transactor) {
+    return new Promise(resolve => {
+      this.fill(val, transactor).deref(resolve);
     });
+  }
 
-    if(!handler.active) {
-      return Promise.resolve(undefined); // TODO: this seems like an inappropriate value to resolve to
-    }
+  drain(tx = new Transactor()) {
+    if(!(tx instanceof Transactor)) { throw new Error("Expecting Transactor to be passed to drain"); }
+    if(!tx.active) { return tx; }
 
     if(this._buffer.length) {
       let bufVal = this._buffer.remove();
 
       while(!this._buffer.full && this._putters.length) {
-        let putter = this._putters.pop();
+        let putter = this.putters.pop();
 
         if(putter.active) {
-          putter = putter.commit();
+          let putTx = putter.commit();
 
-          dispatch.run(() => this._buffer.add(putter()));
+          dispatch.run(() => this._buffer.add(putTx()));
         }
       }
 
-      handler.commit()(bufVal);
+      tx.commit()(bufVal);
     } else if(this._putters.length) {
-      let putter = this._putters.pop();
+      let putterTx = this._putters.pop();
 
-      while(this._putters.length && !putter.active) {
-        putter = this._putters.pop();
+      while(this._putters.length && !putterTx.active) {
+        putterTx = this._putters.pop();
       }
 
-      if(putter && putter.active) {
-        let handlerCb = handler.commit();
-        putter = putter.commit();
+      if(putterTx && putterTx.active) {
+        let txCb = tx.commit();
+        let putterCb = putterTx.commit();
 
-        dispatch.run(() => handlerCb(putter()))
+        dispatch.run(() => txCb(putterCb()));
       } else {
-        this._takers.resizingUnshift(handler);
+        this._takers.resizingUnshift(tx);
       }
     } else {
-      this._takers.resizingUnshift(handler);
+      this._takers.resizingUnshift(tx);
     }
 
-    return handler.promise;
+    return tx;
+  }
+
+  take(transactor) {
+    return new Promise(resolve => {
+      this.drain(transactor).deref(resolve);
+    });
   }
 
   then(fn, err) {
@@ -188,4 +177,4 @@ class Channel {
 }
 
 
-export { Channel, Handler };
+export { Channel, Transactor };

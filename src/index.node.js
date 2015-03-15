@@ -1,6 +1,6 @@
 import * as chans from "./index.js";
 
-window.CHANS = {
+module.exports = {
   Channel: chans.Channel,
   Transactor: chans.Transactor,
   DroppingBuffer: chans.DroppingBuffer,

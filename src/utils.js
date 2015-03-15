@@ -1,33 +1,48 @@
-import { Channel, Handler } from "./channel.js";
-import { _Promise as Promise } from "./promises.js";
+import { Channel, Transactor } from "./channel.js";
+
+
+class AltsTransactor extends Transactor {
+  constructor(offer, commitCb) {
+    super(offer);
+    this.commitCb = commitCb;
+  }
+  commit() {
+    this.commitCb();
+    return super.commit();
+  }
+}
+
 
 export function alts(race) {
-  let handlers = [];
+  let transactors = [];
   let outCh = new Channel();
 
-  race.map(function(cmd) {
+  let deactivate = () => { transactors.forEach(h => h.active = false) }
+
+  race.map(cmd => {
+
     if(Array.isArray(cmd)) {
+      let tx = new AltsTransactor(val, () => {
+        transactors.forEach(h => h.active = false);
+      });
       let [ ch, val ] = cmd;
-      let handler = new Handler((resolve, val) => {
-        resolve([ ch, true ]);
-        handlers.forEach(h => h.commit());
-        return val;
+      ch.put(val, tx).then(function() {
+        outCh.put([ val, ch ]);
       });
 
-      handlers.push(handler);
-      ch.put(val, handler);
+      transactors.push(tx);
     } else {
-      let handler = new Handler((resolve, val) => {
-        resolve([ cmd, val ]);
-        handlers.forEach(h => h.commit());
+      let tx = new AltsTransactor(true, () => {
+        transactors.forEach(h => h.active = false);
       });
 
-      handlers.push(handler);
-      cmd.take(handler);
+      cmd.take(tx).then(function(val) {
+        outCh.put([ val, cmd ]);
+      });
+
+      transactors.push(tx);
     }
   });
-
-  outCh.put(Promise.race(handlers.map((h) => h.promise)));
 
   return outCh;
 }
@@ -58,4 +73,23 @@ export function intoArray(ch) {
       return ch.take().then(drain);
     }
   });
+}
+
+// Enforces order resolution on resulting channel
+// This might need to be the default behavior, though that requires more thought
+export function order(inch, sizeOrBuf) {
+  var outch = new Channel(sizeOrBuf);
+
+  function drain() {
+    inch.take().then(val => {
+      if(val === null) {
+        outch.close();
+      } else {
+        outch.put(val).then(drain);
+      }
+    });
+  }
+  drain();
+
+  return outch;
 }
