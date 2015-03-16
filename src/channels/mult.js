@@ -1,3 +1,4 @@
+import { Promise } from "./promise.js";
 
 function distribute(taps, val) {
   if(!taps.length) {
@@ -11,7 +12,7 @@ function distribute(taps, val) {
   }
 }
 
-export class Mult {
+class Mult {
 
   constructor(ch) {
     this._taps = [];
@@ -56,3 +57,5 @@ export class Mult {
   }
 
 }
+
+export { Mult };

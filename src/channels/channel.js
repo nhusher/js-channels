@@ -1,6 +1,7 @@
 
 import { FixedBuffer, RingBuffer } from "./buffers.js";
 import { Dispatch } from "./dispatch.js";
+import { Promise } from "./promise.js";
 
 // --------------------------------------------------------------------------
 

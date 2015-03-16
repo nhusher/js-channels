@@ -1,5 +1,5 @@
 
-import { Channel, RingBuffer, FixedBuffer, SlidingBuffer, DroppingBuffer, alts, timeout, order } from "../src/index.js";
+import { Channel, RingBuffer, FixedBuffer, SlidingBuffer, DroppingBuffer, alts, timeout, order } from "../src/channels/index.js";
 
 function assert(expr, val, msg = `Expected ${val}, received ${expr}`) {
   if(expr !== val) {
@@ -297,65 +297,3 @@ channelTest([ new Channel(3) ], channel => {
   Promise.all([ failure, success]).then(() => channel.close());
 
 })).then(() => console.log("Tests complete."));
-
-
-//(() => {
-//
-//
-//
-//  function stripTimeouts(channel, time) {
-//    var outch = new Channel();
-//
-//    function race(p) {
-//      return Promise.race([ timeout(time).then(() => { throw "TIMEOUT"; }), p ])
-//    }
-//
-//    function drain() {
-//      if(channel.open) {
-//        channel.drain().deref(v => {
-//          race(v).then(s => outch.put(s), () => {});
-//          drain();
-//        });
-//      } else {
-//        outch.close();
-//      }
-//    }
-//
-//    drain();
-//
-//    return outch;
-//  }
-//
-//  var channel = new Channel(),
-//      stripped = stripTimeouts(channel, 60);
-//
-//  function putVals() {
-//    var p = new Promise(r => setTimeout(r, Math.random() * 100));
-//
-//    if(channel.open) {
-//      channel.put(p).then(function() {
-//        putVals();
-//      });
-//    }
-//  }
-//
-//  function takeVals() {
-//    stripped.then(v => {
-//      console.log(v);
-//      if(channel.open) {
-//        takeVals();
-//      }
-//    })
-//  }
-//
-//
-//  putVals();
-//  takeVals();
-//
-//
-//  setTimeout(() => {
-//    channel.close();
-//    console.log("Closed.");
-//  }, 5000);
-//
-//})();

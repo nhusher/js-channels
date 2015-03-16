@@ -1,4 +1,4 @@
-import * as chans from "./index.js";
+import * as chans from "../channels/index.js";
 
 window.CHANS = {
   Channel: chans.Channel,

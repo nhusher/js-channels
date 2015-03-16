@@ -4,7 +4,7 @@ let defaultAsynchronizer = (typeof setImmediate === 'function') ? function(fn) {
   return setTimeout(fn);
 };
 
-export class Dispatch {
+class Dispatch {
   constructor(asynchronizer) {
     this._asynchronizer = asynchronizer || defaultAsynchronizer;
     this._queue = [];
@@ -20,3 +20,6 @@ export class Dispatch {
     });
   }
 }
+
+
+export { Dispatch };

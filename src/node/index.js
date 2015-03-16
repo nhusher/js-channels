@@ -1,4 +1,4 @@
-import * as chans from "./index.js";
+import * as chans from "../node/index.js";
 
 module.exports = {
   Channel: chans.Channel,
