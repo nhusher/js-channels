@@ -57,7 +57,7 @@ ModuleFormatter.prototype = {
   importSpecifier: function(specifier, node, nodes) {
     var importName = node.source.value,
         fileName = path.basename(node.source.value, '.js'),
-        modName = fileName === importName ? fileName : 'async' + capitalize(fileName),
+        modName = fileName === importName ? fileName : 'chan' + capitalize(fileName),
         varImport,
         modImport;
 
@@ -99,32 +99,8 @@ ModuleFormatter.prototype = {
   },
 
   getModuleName: function() {
-    return 'async' + capitalize(this.file.opts.basename);
+    return 'chan' + capitalize(this.file.opts.basename);
   }
 };
-
-//ModuleFormatter.prototype.transform = function (ast) {
-//  // this is ran after all transformers have had their turn at modifying the ast
-//  // feel free to modify this however
-//};
-//
-//ModuleFormatter.prototype.importDeclaration = function (node, nodes) {
-//  // node is an ImportDeclaration
-//};
-//
-//ModuleFormatter.prototype.importSpecifier = function (specifier, node, nodes) {
-//  // specifier is an ImportSpecifier
-//  // node is an ImportDeclaration
-//};
-//
-//ModuleFormatter.prototype.exportDeclaration = function (node, nodes) {
-//  // node is an ExportDeclaration
-//};
-//
-//ModuleFormatter.prototype.exportSpecifier = function (specifier, node, nodes) {
-//  // specifier is an ExportSpecifier
-//  // node is an ExportDeclaration
-//};
-
 
 module.exports = ModuleFormatter;

@@ -14,18 +14,19 @@ import {
     partition
 } from "../src/channels/index.js";
 
+// Nick's ad-hoc testing tools:
+
 function assert(expr, val, msg = `Expected ${val}, received ${expr}`) {
   if(expr !== val) {
     throw new Error(msg);
   }
-
-  //console.log("ASSERT", expr, val);
 }
 
 function failTest(msg) {
   throw new Error(msg);
 }
 
+// Pass in some channels and the test will finish when all the channels are closed
 function channelTest(chans, test) {
   let joint = chans.map(c => {
     let resolver, promise = new Promise(r => resolver = r);
@@ -77,6 +78,10 @@ function hoist(fn, ...args) {
 })();
 
 (() => {
+  /*
+  A FixedBuffer holds a fixed number of items and no more. It will throw an exception if you attempt to add values to
+  it when it is full. A buffer is a FIFO construct.
+   */
   let buf = new FixedBuffer(1);
 
   buf.add(10);
@@ -92,6 +97,9 @@ function hoist(fn, ...args) {
 })();
 
 (() => {
+  /*
+  The SlidingBuffer
+   */
   let buf = new SlidingBuffer(1);
 
   buf.add(10);

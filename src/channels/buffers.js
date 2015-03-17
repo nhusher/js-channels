@@ -100,6 +100,9 @@ class FixedBuffer {
   }
 
   add(v) {
+    if(this.full) {
+      throw new Error("Cannot add to a full buffer.");
+    }
     this._buf.resizingUnshift(v);
   }
 
