@@ -24,8 +24,5 @@
     "gulp-watch": "^4.1.1",
     "recast": "^0.10.7",
     "through2": "^0.6.3"
-  },
-  "dependencies": {
-    "bluebird": "^2.9.14"
   }
 }

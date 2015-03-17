@@ -41,13 +41,44 @@ class Transactor {
 
 let dispatch = new Dispatch();
 
+let attempt = function(fn, exh) { try { return fn() } catch(e) { return exh(e); } }
+let passthrough = function(next) {
+  return function(value) {
+    return arguments.length ? next(value) : next();
+  }
+};
+let defaultExHandler = function(e) { console.error(e); return false; }
+let reduced = { reduced: true };
+
 class Channel {
-  constructor(sizeOrBuf) {
-    this._buffer = (sizeOrBuf instanceof FixedBuffer) ? sizeOrBuf : new FixedBuffer(sizeOrBuf || 0);
-    this._takers = new RingBuffer(32);
-    this._putters = new RingBuffer(32);
+  constructor(sizeOrBuf, xform, exceptionHandler) {
+    let doAdd = val => {
+      return arguments.length ? this._buffer.add(val) : this._buffer;
+    }
+
+    this._buffer    = (sizeOrBuf instanceof FixedBuffer) ? sizeOrBuf : new FixedBuffer(sizeOrBuf || 0);
+    this._takers    = new RingBuffer(32);
+    this._putters   = new RingBuffer(32);
+    this._xformer   = xform ? xform(doAdd) : passthrough(doAdd);
+    this._exHandler = exceptionHandler || defaultExHandler;
 
     this._isOpen = true;
+  }
+
+  _insert() {
+    return attempt(() => this._xformer.apply(this, arguments), this._exHandler);
+  }
+
+  abort() {
+    while(this._putters.length) {
+      let putter = this._putters.pop();
+
+      if(putter.active) {
+        let putterCb = putter.commit();
+        dispatch.run(() => putterCb(true));
+      }
+    }
+    this._putters.cleanup(() => false);
   }
 
   fill(val, tx = new Transactor(val)) {
@@ -64,9 +95,8 @@ class Channel {
 
     if(!this._buffer.full) {
       // The channel has some free space. Stick it in the buffer and then drain any waiting takes.
-
       tx.commit()(true);
-      this._buffer.add(val);
+      let done = attempt(() => this._insert(val) === reduced, this._exHandler);
 
       while(this._takers.length && this._buffer.length) {
         let takerTx = this._takers.pop();
@@ -78,6 +108,8 @@ class Channel {
           dispatch.run(() => takerCb(val));
         }
       }
+
+      if(done) { this.abort(); }
 
       return tx;
     } else if(this._takers.length) {
@@ -91,9 +123,9 @@ class Channel {
 
       if(takerTx && takerTx.active) {
         tx.commit()(true);
-        let takeCb = takerTx.commit();
+        let takerCb = takerTx.commit();
 
-        dispatch.run(() => takeCb(val));
+        dispatch.run(() => takerCb(val));
       } else {
         this._putters.resizingUnshift(tx);
       }
@@ -118,28 +150,42 @@ class Channel {
       let bufVal = this._buffer.remove();
 
       while(!this._buffer.full && this._putters.length) {
-        let putter = this.putters.pop();
+        let putter = this._putters.pop();
 
         if(putter.active) {
-          let putTx = putter.commit();
+          let putTx = putter.commit(),
+              val = putter.offered; // Kinda breaking the rules here
 
-          dispatch.run(() => this._buffer.add(putTx()));
+          dispatch.run(() => putTx());
+          let done = attempt(() => this._insert(val) === reduced, this._exHandler);
+
+          if(done === reduced) { this.abort(); }
         }
       }
 
       tx.commit()(bufVal);
     } else if(this._putters.length) {
-      let putterTx = this._putters.pop();
+      let putter = this._putters.pop();
 
-      while(this._putters.length && !putterTx.active) {
-        putterTx = this._putters.pop();
+      while(this._putters.length && !putter.active) {
+        putter = this._putters.pop();
       }
 
-      if(putterTx && putterTx.active) {
-        let txCb = tx.commit();
-        let putterCb = putterTx.commit();
+      if(putter && putter.active) {
+        let txCb = tx.commit(),
+            putTx = putter.commit(),
+            val = putter.offered;
 
-        dispatch.run(() => txCb(putterCb()));
+        dispatch.run(() => putTx());
+        txCb(val);
+      } else if(!this.open) {
+        attempt(() => this._insert(), this._exHandler);
+
+        if(this._buffer.length) {
+          txCb(this._buffer.remove());
+        } else {
+          txCb(null);
+        }
       } else {
         this._takers.resizingUnshift(tx);
       }
@@ -161,15 +207,46 @@ class Channel {
   }
 
   close() {
-    this._isOpen = false;
+    if(this.open) {
+      this._isOpen = false;
 
-    while (this._takers.length) {
-      let taker = this._takers.pop();
+      if(this._putters.length === 0) {
+        attempt(() => this._insert(), this._exHandler);
+      }
 
-      if(taker.active) {
-        taker.commit()(null);
+      while (this._takers.length) {
+        let taker = this._takers.pop();
+
+        if(taker.active) {
+          let val = this._buffer.length ? this._buffer.remove() : null,
+              takerCb = taker.commit();
+
+          dispatch.run(() => takerCb(val));
+        }
       }
     }
+  }
+
+  into(otherChan, shouldClose) {
+    var self = this;
+
+    function into(val) {
+      if(val === nil && shouldClose) {
+        out.close();
+      } else {
+        out.put(val).then(open => {
+          if(!open && shouldClose) {
+            self.close();
+          } else {
+            self.take().then(mapper);
+          }
+        });
+      }
+    }
+
+    this.take().then(into);
+
+    return otherChan;
   }
 
   get open() {
@@ -177,5 +254,6 @@ class Channel {
   }
 }
 
+Channel.reduced = reduced;
 
 export { Channel, Transactor };

@@ -15,6 +15,7 @@ class Dispatch {
 
     this._asynchronizer(() => {
       while(this._queue.length) {
+        //console.log("QUEUE", this._queue[0]);
         this._queue.shift()();
       }
     });

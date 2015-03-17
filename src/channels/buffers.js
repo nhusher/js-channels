@@ -72,6 +72,16 @@ class RingBuffer {
     }
   }
 
+  cleanup(keep) {
+    for(let i = 0, l = this.length; i < l; i += 1) {
+      let item = this.pop();
+
+      if(keep(item)) {
+        unshift(item);
+      }
+    }
+  }
+
   get length() {
     return this._length;
   }

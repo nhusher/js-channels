@@ -57,7 +57,7 @@ ModuleFormatter.prototype = {
   importSpecifier: function(specifier, node, nodes) {
     var importName = node.source.value,
         fileName = path.basename(node.source.value, '.js'),
-        modName = fileName === importName ? fileName : 'jsch' + capitalize(fileName),
+        modName = fileName === importName ? fileName : 'async' + capitalize(fileName),
         varImport,
         modImport;
 
@@ -99,7 +99,7 @@ ModuleFormatter.prototype = {
   },
 
   getModuleName: function() {
-    return 'jsch' + capitalize(this.file.opts.basename);
+    return 'async' + capitalize(this.file.opts.basename);
   }
 };
 

@@ -1,12 +1,25 @@
 
-import { Channel, RingBuffer, FixedBuffer, SlidingBuffer, DroppingBuffer, alts, timeout, order } from "../src/channels/index.js";
+import {
+    Channel,
+    RingBuffer,
+    FixedBuffer,
+    SlidingBuffer,
+    DroppingBuffer,
+    alts,
+    timeout,
+    order,
+    map,
+    filter,
+    partitionBy,
+    partition
+} from "../src/channels/index.js";
 
 function assert(expr, val, msg = `Expected ${val}, received ${expr}`) {
   if(expr !== val) {
     throw new Error(msg);
   }
 
-//  console.log("ASSERT", expr, val);
+  //console.log("ASSERT", expr, val);
 }
 
 function failTest(msg) {
@@ -295,5 +308,111 @@ channelTest([ new Channel(3) ], channel => {
   let success = channel.take().then(v => assert(v, 100));
 
   Promise.all([ failure, success]).then(() => channel.close());
+
+})).then(hoist(channelTest, [ new Channel() ], (channel) => {
+
+  channel.put(100).then(function() {
+    channel.take().then(function(v) {
+      assert(v, 200);
+      channel.close();
+    });
+  });
+
+  // The above code will deadlock if the next block isn't there, because the put is halted on a zero-length buf
+
+  timeout(100).then(function() {
+    channel.take().then(function(v) {
+      assert(v, 100);
+      channel.put(200);
+    });
+  });
+
+})).then(hoist(channelTest, [
+  new Channel(1, map(v => v * 2))
+], (doubler) => {
+
+  // Values put on the channel are doubled
+  doubler.put(1);
+  doubler.put(2);
+  doubler.put(3);
+
+  Promise.all([
+
+    doubler.take().then((v) => assert(v, 2)),
+    doubler.take().then((v) => assert(v, 4)),
+    doubler.take().then((v) => assert(v, 6))
+
+  ]).then(() => doubler.close());
+
+
+})).then(hoist(channelTest, [
+  new Channel(1, filter(v => v % 2 === 0))
+], (evens) => {
+
+  // Values put on the channel are doubled
+  evens.put(1);
+  evens.put(2);
+  evens.put(3);
+  evens.put(4);
+
+  Promise.all([
+
+    evens.take().then((v) => assert(v, 2)),
+    evens.take().then((v) => assert(v, 4))
+
+  ]).then(() => evens.close());
+
+})).then(hoist(channelTest, [
+  new Channel(1, partition(2))
+], (groups) => {
+
+  // Values put on the channel are doubled
+  groups.put(1);
+  groups.put(2);
+  groups.put(3);
+  groups.put(4);
+
+  Promise.all([
+    groups.take().then(([_1, _2]) => {
+      assert(_1, 1);
+      assert(_2, 2);
+    }),
+    groups.take().then(([_3, _4]) => {
+      assert(_3, 3);
+      assert(_4, 4);
+    })
+  ]).then(() => groups.close());
+
+})).then(hoist(channelTest, [
+  new Channel(10, partitionBy(v => {
+    let normalized = v.replace(/\W+/g, '').toLowerCase();
+
+    return normalized === normalized.split('').reverse().join('');
+  }))
+], (vals) => {
+
+  // Values put on the channel are doubled
+  vals.put("tacocat");
+  vals.put("racecar");
+  vals.put("not a palindrome");
+  vals.put("also not a palindrome");
+  vals.put("Madam I'm Adam");
+  vals.put("Ah, satan sees natasha!");
+  vals.put("one last try...");
+
+  Promise.all([
+    vals.take().then(([_1, _2]) => {
+      assert(_1, "tacocat");
+      assert(_2, "racecar");
+    }),
+    vals.take().then(([_1, _2]) => {
+      assert(_1, "not a palindrome");
+      assert(_2, "also not a palindrome");
+    }),
+    vals.take().then(([_1, _2]) => {
+      assert(_1, "Madam I'm Adam");
+      assert(_2, "Ah, satan sees natasha!");
+    })
+  ]).then(() => vals.close());
 
 })).then(() => console.log("Tests complete."));

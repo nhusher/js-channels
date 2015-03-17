@@ -1,6 +1,19 @@
-import { Channel, Transactor } from "./channel.js";
+import { Channel, Transactor } from "./channels.js";
 import { FixedBuffer, DroppingBuffer, SlidingBuffer, RingBuffer } from "./buffers.js";
-import { Mult } from "./mult.js";
-import { alts, timeout, pipe, intoArray, order } from "./utils.js";
+import { alts, timeout, order, map, filter, partitionBy, partition } from "./utils.js";
 
-export { Channel, Transactor, FixedBuffer, DroppingBuffer, SlidingBuffer, RingBuffer, Mult, alts, timeout, pipe, intoArray, order };
+export {
+    Channel,
+    Transactor,
+    FixedBuffer,
+    DroppingBuffer,
+    SlidingBuffer,
+    RingBuffer,
+    alts,
+    timeout,
+    order,
+    map,
+    filter,
+    partitionBy,
+    partition
+};
