@@ -327,6 +327,16 @@ channelTest([ new Channel(3) ], channel => {
     });
   });
 
+})).then(hoist(channelTest, [ new Channel() ], (channel) => {
+
+  channel.put(100);
+  channel.put(200);
+  channel.close();
+
+  channel.take().then(v => assert(v, 100));
+  channel.take().then(v => assert(v, 200));
+
+
 })).then(hoist(channelTest, [
   new Channel(1, map(v => v * 2))
 ], (doubler) => {
