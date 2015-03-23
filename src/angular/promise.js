@@ -1,14 +1,15 @@
 
 import * as $q from "$q";
 
-var Promise = r => {
+
+var Prom = r => {
   return $q(r);
 };
 
-Promise.all = $q.all;
-Promise.reject = $q.reject;
+Prom.all = $q.all;
+Prom.reject = $q.reject;
 
-Promise.race = proms => {
+Prom.race = proms => {
   var doFulfill, doReject, prom;
 
   prom = $q((fulfill, reject) => {
@@ -21,8 +22,8 @@ Promise.race = proms => {
   return prom;
 };
 
-Promise.resolve = val => {
+Prom.resolve = val => {
   return $q.when(val);
 };
 
-export { Promise };
+export { Prom as Promise };

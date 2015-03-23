@@ -14,34 +14,34 @@ class AltsTransactor extends Transactor {
 
 
 export function alts(race) {
-  let transactors = [];
   let outCh = new Channel();
 
-  let deactivate = () => { transactors.forEach(h => h.active = false) }
-
-  race.map(cmd => {
+  let transactors = race.map(cmd => {
+    let tx;
 
     if(Array.isArray(cmd)) {
-      let tx = new AltsTransactor(val, () => {
-        transactors.forEach(h => h.active = false);
-      });
       let [ ch, val ] = cmd;
-      ch.put(val, tx).then(function() {
-        outCh.put([ val, ch ]);
-      });
 
-      transactors.push(tx);
-    } else {
-      let tx = new AltsTransactor(true, () => {
+      tx = new AltsTransactor(val, () => {
         transactors.forEach(h => h.active = false);
       });
 
-      cmd.take(tx).then(function(val) {
-        outCh.put([ val, cmd ]);
+      ch.fill(val, tx).deref(function() {
+        outCh.fill([ val, ch ]).deref(() => outCh.close());
       });
 
-      transactors.push(tx);
+    } else {
+
+      tx = new AltsTransactor(true, () => {
+        transactors.forEach(h => h.active = false);
+      });
+
+      cmd.drain(tx).deref(function(val) {
+        outCh.fill([ val, cmd ]).deref(() => outCh.close());
+      });
     }
+
+    return tx;
   });
 
   return outCh;
@@ -51,6 +51,24 @@ export function timeout(ms) {
   var ch = new Channel();
   setTimeout(() => { ch.close(); }, ms);
   return ch;
+}
+
+export function pipelineAsync(inch, converter, outch, shouldCloseDownstream = false) {
+  function take(val) {
+    if(val !== null) {
+      Promise.resolve(converter(val)).then(function(converted) {
+        outch.put(converted).then(function(didPut) {
+          if(didPut) {
+            inch.take().then(take);
+          }
+        });
+      });
+    } else if(shouldCloseDownstream) {
+      outch.close();
+    }
+  }
+
+  inch.take().then(take);
 }
 
 // Enforces order resolution on resulting channel
@@ -70,80 +88,4 @@ export function order(inch, sizeOrBuf) {
   drain();
 
   return outch;
-}
-
-export function map(fn) {
-  return function(next) {
-    return function(val) {
-      if(arguments.length) {
-        return next(fn(val));
-      } else {
-        return next();
-      }
-    }
-  }
-}
-
-export function filter(fn) {
-  return function(next) {
-    return function(val) {
-      if(arguments.length) {
-        if (fn(val)) {
-          return next(val);
-        }
-      } else {
-        return next();
-      }
-    }
-  }
-}
-
-export function partitionBy(fn) {
-  let last = null,
-      accumulator = [];
-
-  return function(next) {
-    return function(val) {
-      if(arguments.length) {
-        let predicateResult = fn(val);
-        if(last !== null && predicateResult !== last) {
-          let tmp = accumulator;
-
-          accumulator = [ val ];
-          last = predicateResult;
-
-          return next(tmp);
-        } else {
-          last = predicateResult;
-          accumulator.push(val);
-        }
-      } else {
-        return next(accumulator);
-      }
-    }
-  }
-}
-
-export function partition(num) {
-  let c = 0,
-      a = [];
-
-  return function(next) {
-    return function(val) {
-      if(arguments.length) {
-        a.push(val);
-        c += 1;
-
-        if(c % num === 0) {
-          let tmp = a;
-
-          a = [];
-
-          return next(tmp);
-        }
-      } else {
-        return next(a);
-      }
-    }
-  }
 }

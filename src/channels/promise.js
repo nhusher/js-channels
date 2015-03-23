@@ -1,5 +1,6 @@
 var _Promise;
 
+/* global global:true */
 if(typeof window !== 'undefined' && window.Promise) {
   _Promise = window.Promise;
 } else if(typeof global !== 'undefined' && global.Promise) {

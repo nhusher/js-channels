@@ -1,3 +1,5 @@
+
+/* global setImmediate:true */
 let defaultAsynchronizer = (typeof setImmediate === 'function') ? function(fn) {
   return setImmediate(fn);
 } : function(fn) {

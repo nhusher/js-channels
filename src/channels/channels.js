@@ -2,6 +2,7 @@
 import { FixedBuffer, RingBuffer } from "./buffers.js";
 import { Dispatch } from "./dispatch.js";
 import { Promise } from "./promise.js";
+import { transducers } from "./transducers.js";
 
 // --------------------------------------------------------------------------
 
@@ -24,7 +25,7 @@ class Transactor {
       this.callbacks.forEach(c => c(val));
 
       return this.offered;
-    }
+    };
   }
 
   deref(callback) {
@@ -41,44 +42,39 @@ class Transactor {
 
 let dispatch = new Dispatch();
 
-let attempt = function(fn, exh) { try { return fn() } catch(e) { return exh(e); } }
-let passthrough = function(next) {
-  return function(value) {
-    return arguments.length ? next(value) : next();
-  }
-};
-let defaultExHandler = function(e) { console.error(e); return false; }
-let reduced = { reduced: true };
-
 class Channel {
-  constructor(sizeOrBuf, xform, exceptionHandler) {
-    let doAdd = val => {
-      return arguments.length ? this._buffer.add(val) : this._buffer;
+  constructor(sizeOrBuf, xform) {
+    if(!transducers && xform) {
+      console.info("Using a transducer requires transducers-js <https://github.com/cognitect-labs/transducers-js>");
     }
+    if(!sizeOrBuf && xform && transducers) {
+      console.info("Transducers will be ignored for unbuffered channels.");
+    }
+
+    // Adds value to the buffer:
+    // doAdd() => Buffer
+    // doAdd(val) => Buffer
+    let doAdd = (buf, val) => buf.add(val);
 
     this._buffer    = (sizeOrBuf instanceof FixedBuffer) ? sizeOrBuf : new FixedBuffer(sizeOrBuf || 0);
     this._takers    = new RingBuffer(32);
     this._putters   = new RingBuffer(32);
-    this._xformer   = xform ? xform(doAdd) : passthrough(doAdd);
-    this._exHandler = exceptionHandler || defaultExHandler;
+    this._xformer   = xform && transducers ? xform(transducers.wrap(doAdd)) : doAdd;
 
     this._isOpen = true;
   }
 
-  _insert() {
-    return attempt(() => this._xformer.apply(this, arguments), this._exHandler);
-  }
-
-  abort() {
-    while(this._putters.length) {
-      let putter = this._putters.pop();
-
-      if(putter.active) {
-        let putterCb = putter.commit();
-        dispatch.run(() => putterCb(true));
+  _insert(val) {
+    if(transducers) {
+      if(val) {
+        return this._xformer.step(this._buffer, val);
+      } else {
+        return this._xformer.result(this._buffer);
       }
+    } else if(val) {
+      this._xformer(this._buffer, val);
     }
-    this._putters.cleanup(() => false);
+    return false;
   }
 
   fill(val, tx = new Transactor(val)) {
@@ -96,20 +92,22 @@ class Channel {
     if(!this._buffer.full) {
       // The channel has some free space. Stick it in the buffer and then drain any waiting takes.
       tx.commit()(true);
-      let done = attempt(() => this._insert(val) === reduced, this._exHandler);
+
+      let done = transducers ? transducers.reduced(this._insert(val)) : this._insert(val);
 
       while(this._takers.length && this._buffer.length) {
         let takerTx = this._takers.pop();
 
         if(takerTx.active) {
-          let val = this._buffer.remove();
+          let v = this._buffer.remove();
           let takerCb = takerTx.commit();
 
-          dispatch.run(() => takerCb(val));
+          dispatch.run(() => takerCb(v));
         }
       }
-
-      if(done) { this.abort(); }
+      if(done) {
+        this.close();
+      }
 
       return tx;
     } else if(this._takers.length) {
@@ -157,9 +155,7 @@ class Channel {
               val = putter.offered; // Kinda breaking the rules here
 
           dispatch.run(() => putTx());
-          let done = attempt(() => this._insert(val) === reduced, this._exHandler);
-
-          if(done === reduced) { this.abort(); }
+          this._insert(val);
         }
       }
 
@@ -179,7 +175,9 @@ class Channel {
         dispatch.run(() => putTx());
         txCb(val);
       } else if(!this.open) {
-        attempt(() => this._insert(), this._exHandler);
+        this._insert();
+
+        let txCb = tx.commit();
 
         if(this._buffer.length) {
           txCb(this._buffer.remove());
@@ -211,7 +209,7 @@ class Channel {
       this._isOpen = false;
 
       if(this._putters.length === 0) {
-        attempt(() => this._insert(), this._exHandler);
+        this._insert();
       }
 
       while (this._takers.length) {
@@ -227,33 +225,9 @@ class Channel {
     }
   }
 
-  into(otherChan, shouldClose) {
-    var self = this;
-
-    function into(val) {
-      if(val === nil && shouldClose) {
-        out.close();
-      } else {
-        out.put(val).then(open => {
-          if(!open && shouldClose) {
-            self.close();
-          } else {
-            self.take().then(mapper);
-          }
-        });
-      }
-    }
-
-    this.take().then(into);
-
-    return otherChan;
-  }
-
   get open() {
     return this._isOpen;
   }
 }
-
-Channel.reduced = reduced;
 
 export { Channel, Transactor };

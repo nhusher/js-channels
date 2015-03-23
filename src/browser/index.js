@@ -1,6 +1,6 @@
 import * as chans from "../channels/index.js";
 
-// TOOD.
+// TODO
 //window.CHANS = {
 //  Channel: chans.Channel,
 //  Transactor: chans.Transactor,

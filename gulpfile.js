@@ -5,29 +5,31 @@ var babel = require('gulp-babel');
 var browserify = require('browserify');
 var concat = require('gulp-concat');
 var gulp = require('gulp');
-var ignore = require('gulp-ignore');
 var merge = require('gulp-merge');
 var ngAnnotate = require('gulp-ng-annotate');
 var rename = require('gulp-rename');
 var sourcemaps = require('gulp-sourcemaps');
 var through2 = require('through2');
 var uglify = require('gulp-uglify');
-var watch = require('gulp-watch');
 
 var browserified = function() {
   return through2.obj(function (file, enc, next) {
     return browserify({ entries: file.path, debug: true })
         .transform(babelify)
         .bundle(function(err, res) {
+          if(err) {
+            throw err;
+          }
+
           file.contents = res;
           next(null, file);
         });
   });
-}
+};
 
 gulp.task('clean', function() {
   return gulp.src('dist', { read: false }).pipe(require('gulp-clean')());
-})
+});
 
 gulp.task('browser', function () {
   return gulp.src('src/browser/index.js')

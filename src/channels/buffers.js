@@ -77,7 +77,7 @@ class RingBuffer {
       let item = this.pop();
 
       if(keep(item)) {
-        unshift(item);
+        this.unshift(item);
       }
     }
   }
@@ -104,6 +104,8 @@ class FixedBuffer {
       throw new Error("Cannot add to a full buffer.");
     }
     this._buf.resizingUnshift(v);
+
+    return this;
   }
 
   get length() {
@@ -122,6 +124,8 @@ class DroppingBuffer extends FixedBuffer {
     if(this._buf.length < this._size) {
       this._buf.unshift(v);
     }
+
+    return this;
   }
 
   get full() {
@@ -137,6 +141,8 @@ class SlidingBuffer extends FixedBuffer {
       this.remove();
     }
     this._buf.unshift(v);
+
+    return this;
   }
 
   get full() {
