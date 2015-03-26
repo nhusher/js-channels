@@ -31,25 +31,6 @@ gulp.task('clean', function() {
   return gulp.src('dist', { read: false }).pipe(require('gulp-clean')());
 });
 
-gulp.task('browser', function () {
-  return gulp.src('src/browser/index.js')
-    .pipe(browserified())
-    .pipe(sourcemaps.init({ loadMaps: true }))
-    .pipe(rename('channels.js'))
-    .pipe(sourcemaps.write('./'))
-    .pipe(gulp.dest('dist/browser'));
-});
-
-gulp.task('browser-min', function () {
-  return gulp.src('src/browser/index.js')
-      .pipe(browserified())
-      .pipe(sourcemaps.init({ loadMaps: true }))
-      .pipe(uglify())
-      .pipe(rename('channels.min.js'))
-      .pipe(sourcemaps.write())
-      .pipe(gulp.dest('dist/browser'));
-});
-
 gulp.task('angular', function() {
   var tx = gulp.src([ 'src/channels/*.js', 'src/angular/promise.js', '!src/channels/index*', '!src/channels/promise.js' ])
       .pipe(sourcemaps.init({ debug: true }))
@@ -80,6 +61,14 @@ gulp.task('angular-min', function() {
 
 });
 
+gulp.task('node', function() {
+  return gulp.src('src/channels/*.js')
+      .pipe(sourcemaps.init())
+      .pipe(babel())
+      .pipe(sourcemaps.write('./'))
+      .pipe(gulp.dest('dist/node'));
+});
+
 gulp.task('test', function() {
   return gulp.src('test/test.js')
     .pipe(browserified())
@@ -87,4 +76,4 @@ gulp.task('test', function() {
 });
 
 // TODO: browser module
-gulp.task('default', [ 'clean', /* 'browser', 'browser-min', */ 'angular', 'angular-min', 'test' ]);
+gulp.task('default', [ 'clean', 'node', 'angular', 'angular-min', 'test' ]);
