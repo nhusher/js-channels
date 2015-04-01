@@ -31,7 +31,7 @@ gulp.task('clean', function() {
   return gulp.src('dist', { read: false }).pipe(require('gulp-clean')());
 });
 
-gulp.task('angular', function() {
+gulp.task('angular', [ 'clean' ], function() {
   var tx = gulp.src([ 'src/channels/*.js', 'src/angular/promise.js', '!src/channels/index*', '!src/channels/promise.js' ])
       .pipe(sourcemaps.init({ debug: true }))
       .pipe(babel({ modules: require('./util/angular-module-formatter.js') }));
@@ -39,20 +39,21 @@ gulp.task('angular', function() {
   return merge(
           gulp.src('src/angular/index.js').pipe(sourcemaps.init({ debug: true })),
           tx)
+      .pipe(ngAnnotate())
       .pipe(concat('js-channels.js'))
       .pipe(sourcemaps.write())
       .pipe(gulp.dest('dist/angular'));
 
 });
 
-gulp.task('angular-min', function() {
+gulp.task('angular-min', [ 'clean' ], function() {
   var tx = gulp.src([ 'src/channels/*.js', 'src/angular/promise.js', '!src/channels/index*', '!src/channels/promise.js' ])
       .pipe(sourcemaps.init({ debug: true }))
       .pipe(babel({ modules: require('./util/angular-module-formatter.js') }));
 
   return merge(
-      gulp.src('src/angular/index.js').pipe(sourcemaps.init({ debug: true })),
-      tx)
+          gulp.src('src/angular/index.js').pipe(sourcemaps.init({ debug: true })),
+          tx)
       .pipe(ngAnnotate())
       .pipe(concat('js-channels.min.js'))
       .pipe(uglify())
@@ -61,7 +62,7 @@ gulp.task('angular-min', function() {
 
 });
 
-gulp.task('node', function() {
+gulp.task('node', [ 'clean' ], function() {
   return gulp.src('src/channels/*.js')
       .pipe(sourcemaps.init())
       .pipe(babel())
@@ -69,11 +70,11 @@ gulp.task('node', function() {
       .pipe(gulp.dest('dist/node'));
 });
 
-gulp.task('test', function() {
+gulp.task('test', [ 'clean' ], function() {
   return gulp.src('test/test.js')
     .pipe(browserified())
     .pipe(gulp.dest('dist/tests'));
 });
 
 // TODO: browser module
-gulp.task('default', [ 'clean', 'node', 'angular', 'angular-min', 'test' ]);
+gulp.task('default', [ 'node', 'angular', 'angular-min', 'test' ]);
