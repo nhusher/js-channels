@@ -1,6 +1,6 @@
 {
   "name": "js-channels",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "CSP-style channels with promises",
   "main": "dist/channels.js",
   "scripts": {},
